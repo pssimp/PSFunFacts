@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payroll Fact Check - Interaktív Tabló</title>
+    <style>
+        :root {
+            --ps-blue: #0f1a4a;
+            --ps-gold: #e6a817; 
+            --text-dark: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--ps-blue);
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-image: url('light.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        .game-header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            color: #ffffff; 
+            text-transform: uppercase;
+            text-shadow: 2px 2px 10px var(--ps-gold), 0px 0px 15px rgba(0,0,0,0.8);
+            text-align: center;
+        }
+
+        .game-header p {
+            color: var(--ps-blue);
+            font-weight: bold;
+            text-shadow: 0 0 5px white;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        #tablo-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 30px 20px; /* Nagyobb függőleges rés a buborékok miatt */
+            width: 90%;
+            max-width: 1100px;
+            padding: 20px;
+        }
+
+        .person-card {
+            background: rgba(255, 255, 255, 0.9); 
+            border-radius: 12px; 
+            padding: 15px;
+            border: 1px solid rgba(0,0,0,0.1);
+            position: relative; /* Így ehhez képest tudjuk pozicionálni a buborékot */
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        /* Nem használunk overflow: hidden-t a kártyán, hogy a kibuggyanó buborék látszódjon */
+
+        .person-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .person-card img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--ps-gold);
+        }
+
+        .person-card span {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--ps-blue);
+            text-align: center;
+        }
+
+        /* PÁRBESZÉDFELHŐ (SPEECH BUBBLE) STÍLUS */
+        .speech-bubble {
+            position: absolute;
+            bottom: 115%; /* A kártya felett fog lebegni */
+            left: 50%;
+            transform: translateX(-50%) scale(0.8);
+            background: var(--ps-blue);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            width: 200px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            pointer-events: none; /* Ne zavarjon bele a kattintásokba */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        /* A kis nyíl a buborék alján */
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px;
+            border-style: solid;
+            border-color: var(--ps-blue) transparent transparent transparent;
+        }
+
+        /* Aktív buborék megjelenítése */
+        .person-card.bubble-active .speech-bubble {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) scale(1);
+        }
+        
+        /* Kiemelés az épp aktív kártyának */
+        .person-card.bubble-active {
+            border-color: var(--ps-gold);
+            box-shadow: 0 8px 25px rgba(230, 168, 23, 0.4);
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-header">
+        <h1>Payroll Portrék</h1>
+        <p>Kattints a kollégákra, hogy megtudj róluk egy kulisszatitkot!</p>
+    </div>
+
+    <div id="tablo-view"></div>
+
+    <script>
+        const employees = [
+            { id: 1, name: "Jakab Beatrix", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Jakab Beatrix.JPG", trueFact: "Egyszer megállítottak a rendőrök, mert azt hitték bevándorló vagyok." },
+            { id: 2, name: "Harcsa Zita", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Harcsa Zita.JPG", trueFact: "3 éve ugyanazt a reggelit eszem majdnem mindennap." },
+            { id: 3, name: "Vizer Istvan", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Vizer Istvan.JPG", trueFact: "Egy munkahelyen dolgoztunk anyukámmal és apukámmal is." },
+            { id: 4, name: "Varga Judit", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Varga Judit.JPG", trueFact: "Majdnem óvodás koromig nem beszéltem, utána viszont egyből barokk körmondatokban." },
+            { id: 5, name: "Tóth Loretta", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Toth Loretta.JPG", trueFact: "Szeretek lőni, és tudok is." },
+            { id: 6, name: "Tóth Csilla", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Toth Csilla.JPG", trueFact: "Nem tudok úszni." },
+            { id: 7, name: "Nagy Brigitta", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Nagy Brigitta.JPG", trueFact: "Még nem repültem." },
+            { id: 8, name: "Mezei Enikő", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Mezei Eniko.JPG", trueFact: "Egyszer eladtam a hajam és abból vettem fesztivál belépőt." },
+            { id: 9, name: "Hatos Jenő", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Hatos Jeno.JPG", trueFact: "Egy busz kereke alá szorult a lábfejem." },
+            { id: 10, name: "Apró Lilla", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Apro Lilla.JPG", trueFact: "Kislányként gyakran beültem a csirkeólba a csirkékhez, annyira szeretem az állatokat." },
+            { id: 11, name: "Boda Anna", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Boda Anna.JPG", trueFact: "Nem láttam még soha élőben filmforgatást." },
+            { id: 12, name: "Szabó Tamara", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Szabo Tamara.JPG", trueFact: "Ugrottam már ki egy repülőből tandemugrás során." },
+            { id: 13, name: "Vass Márta", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Vass Marta.JPG", trueFact: "Félek a kutyáktól." },
+            { id: 14, name: "Kormos Adriána", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Kormos Adriana.JPG", trueFact: "Három hangszeren tudok zenélni." },
+            { id: 15, name: "Szebenyik Márta", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Szebenyik Marta.JPG", trueFact: "Az egyik kedvenc filmem: Constantine - A démonvadász" },
+            { id: 16, name: "Géczi Eszter", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Geczi Eszter.JPG", trueFact: "Egyik évben épp a temetőben voltam, mikor szilveszterkor éjfélt ütött az óra." },
+            { id: 17, name: "Kazó-Dévényi Nikolett", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Kazo-Devenyi Nikolett.JPG", trueFact: "Nem szeretem a csokoládét." },
+            { id: 18, name: "Kovács Márton", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Kovacs Marton Daniel.JPG", trueFact: "Eddig kétszer voltam kopaszra nyírva." },
+            { id: 19, name: "Zöldesi Levente", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Zoldesi Levente.JPG", trueFact: "Mielőtt a procihoz jöttem egy pékségben dolgoztam." },
+            { id: 20, name: "Boncsér Katalin", image: "https://inside2.process-solutions.hu:10443/PSFileManager/files/PSGalery/PSGalery_large/Boncser Katalin.JPG", trueFact: "Disszidálni akartunk családilag külföldre menekültként még gyerekkoromban." }
+        ];
+
+        let activeCard = null;
+
+        window.onload = function() {
+            initTablo();
+            
+            // Külső kattintás figyelése a buborékok bezárásához
+            document.addEventListener('click', function() {
+                closeActiveBubble();
+            });
+        };
+
+        function initTablo() {
+            const tabloView = document.getElementById('tablo-view');
+            tabloView.innerHTML = '';
+
+            employees.forEach(emp => {
+                const card = document.createElement('div');
+                card.className = 'person-card';
+                card.id = `card-${emp.id}`;
+
+                card.innerHTML = `
+                    <div class="speech-bubble">${emp.trueFact}</div>
+                    <img src="${emp.image}" alt="${emp.name}">
+                    <span>${emp.name}</span>
+                `;
+
+                // Kattintás magára a kártyára
+                card.onclick = function(e) {
+                    e.stopPropagation(); // Meggátoljuk, hogy a dokumentum-szintű kattintás azonnal bezárja
+
+                    // Ha már ez a kártya aktív, akkor csukjuk be
+                    if (activeCard === card) {
+                        closeActiveBubble();
+                    } else {
+                        // Különben az előzőt bezárjuk (ha van), és megnyitjuk az újat
+                        closeActiveBubble();
+                        card.classList.add('bubble-active');
+                        activeCard = card;
+                    }
+                };
+
+                tabloView.appendChild(card);
+            });
+        }
+
+        function closeActiveBubble() {
+            if (activeCard) {
+                activeCard.classList.remove('bubble-active');
+                activeCard = null;
+            }
+        }
+    </script>
+</body>
+</html>
